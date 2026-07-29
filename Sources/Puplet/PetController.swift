@@ -41,6 +41,11 @@ final class PetController {
     private var mouseInside = false
     private var homeScreenID: CGDirectDisplayID?
 
+    private var tickTimer: Timer?
+    private var lastTick: CFTimeInterval = 0
+    private var activity: NSObjectProtocol?
+    private var observers: [NSObjectProtocol] = []
+
     private var nextIdleThought: TimeInterval = .random(in: 40...90)
     private var lastSpoke = Date.distantPast
     private var isGenerating = false
@@ -78,10 +83,6 @@ final class PetController {
         brain.onMood = { [weak self] mood in
             self?.apply(mood: mood)
         }
-        scene.onFrame = { [weak self] dt in
-            self?.step(dt)
-        }
-
         workspace.onAppSwitch = { [weak self] app in
             guard let self, Double.random(in: 0...1) < 0.4 else { return }
             self.speak(.appSwitch(app))
@@ -107,6 +108,7 @@ final class PetController {
         panel.ignoresMouseEvents = true
         panel.orderFrontRegardless()
         workspace.start()
+        startMotor()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
             self?.speak(.greeting)
@@ -114,10 +116,74 @@ final class PetController {
     }
 
     func stop() {
+        stopMotor()
         workspace.stop()
         bubble.hide()
         chatInput.hide()
         panel.orderOut(nil)
+    }
+
+    private func startMotor() {
+        activity = ProcessInfo.processInfo.beginActivity(
+            options: .userInitiatedAllowingIdleSystemSleep,
+            reason: "Puplet animation"
+        )
+
+        lastTick = CACurrentMediaTime()
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.tick()
+            }
+        }
+        timer.tolerance = 0.002
+        RunLoop.main.add(timer, forMode: .common)
+        tickTimer = timer
+
+        let center = NotificationCenter.default
+        observers.append(center.addObserver(
+            forName: NSWindow.didChangeScreenNotification, object: panel, queue: .main
+        ) { [weak self] _ in
+            DispatchQueue.main.async { self?.kickRenderer() }
+        })
+        observers.append(center.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            DispatchQueue.main.async { self?.screensChanged() }
+        })
+    }
+
+    private func stopMotor() {
+        tickTimer?.invalidate()
+        tickTimer = nil
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers.removeAll()
+        if let activity {
+            ProcessInfo.processInfo.endActivity(activity)
+        }
+        activity = nil
+    }
+
+    private func tick() {
+        let now = CACurrentMediaTime()
+        let dt = min(now - lastTick, 1.0 / 15.0)
+        lastTick = now
+        guard dt > 0 else { return }
+        step(dt)
+    }
+
+    private func kickRenderer() {
+        surface.isPaused = true
+        surface.isPaused = false
+    }
+
+    private func screensChanged() {
+        if let id = homeScreenID, !NSScreen.screens.contains(where: { $0.displayID == id }) {
+            homeScreenID = (NSScreen.main ?? NSScreen.screens.first)?.displayID
+        }
+        if !isDragging {
+            clampToScreen(currentScreen)
+        }
+        kickRenderer()
     }
 
     private func step(_ dt: TimeInterval) {
@@ -146,7 +212,9 @@ final class PetController {
             origin.x += machine.facing * Self.walkSpeed * CGFloat(dt)
         }
 
-        clampToScreen(screen)
+        if !isDragging {
+            clampToScreen(screen)
+        }
 
         if machine.facing != lastFacing {
             lastFacing = machine.facing
@@ -224,8 +292,8 @@ final class PetController {
         isDragging = false
 
         let center = CGPoint(x: origin.x + Self.canvas.width / 2, y: origin.y + Self.canvas.height / 2)
-        if let screen = NSScreen.screens.first(where: { $0.frame.contains(center) }) {
-            homeScreenID = screen.displayID
+        if let landing = Self.nearestScreen(to: center) {
+            homeScreenID = landing.displayID
         }
 
         let travelled = hypot(NSEvent.mouseLocation.x - dragStart.x, NSEvent.mouseLocation.y - dragStart.y)
@@ -315,9 +383,24 @@ final class PetController {
         }
     }
 
+    static func nearestScreen(to point: CGPoint) -> NSScreen? {
+        if let hit = NSScreen.screens.first(where: { NSMouseInRect(point, $0.frame, false) }) {
+            return hit
+        }
+        return NSScreen.screens.min {
+            squaredDistance(from: point, to: $0.frame) < squaredDistance(from: point, to: $1.frame)
+        }
+    }
+
+    private static func squaredDistance(from point: CGPoint, to rect: CGRect) -> CGFloat {
+        let dx = max(rect.minX - point.x, 0, point.x - rect.maxX)
+        let dy = max(rect.minY - point.y, 0, point.y - rect.maxY)
+        return dx * dx + dy * dy
+    }
+
     func fetchToCursor() {
         let mouse = NSEvent.mouseLocation
-        if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) {
+        if let screen = Self.nearestScreen(to: mouse) {
             homeScreenID = screen.displayID
         }
         origin = CGPoint(x: mouse.x - Self.canvas.width / 2, y: mouse.y)

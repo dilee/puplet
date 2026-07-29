@@ -34,10 +34,28 @@ starts and `exit(0)`s. Add new headless tools there.
 
 ### One tick, one window
 
-`SKScene.update` → `PetScene.onFrame` → `PetController.step(dt)` is the only game loop. That single
-function steps the behavior machine, polls the mouse gate, integrates gravity, moves the window,
-and counts down the idle-thought timer. `dt` is clamped to 1/15 s so a stalled frame can't teleport
-the pet.
+A 60 Hz `Timer` on the main run loop (`PetController.startMotor`) calls `step(dt)`, and that is the
+only game loop. That single function steps the behavior machine, polls the mouse gate, integrates
+gravity, moves the window, and counts down the idle-thought timer. `dt` comes from
+`CACurrentMediaTime()` and is clamped to 1/15 s so a stalled tick can't teleport the pet.
+
+**SpriteKit only draws. Never drive the simulation from `SKScene.update`, and never call
+`setFrameOrigin` from inside a SpriteKit frame callback.** That was the original design and it
+latched the app dead: moving the window across a display boundary reassigns the window's `screen`
+and `backingScaleFactor` from *inside* SKView's own frame dispatch, which stops its display link
+mid-frame and loses the restart. Since `step()` was the only thing that could move the window back
+out of that state, the pet froze permanently at the seam. Mixed-scale display pairs — a HiDPI screen
+beside a 1× one — are what expose it; matched displays survive.
+
+Two details of the timer are load-bearing. It must be registered in `RunLoop.Mode.common`, because
+the context menu, the status-item menu and `NSAlert.runModal` all run the loop in event-tracking or
+modal modes, and a default-mode timer stops the pet dead whenever a menu is open. And a
+`ProcessInfo.beginActivity` assertion is held for the app's lifetime, or App Nap coalesces the ticks
+into multi-second stutters in a background `LSUIElement` app.
+
+`kickRenderer()` toggles `SKView.isPaused` on `NSWindow.didChangeScreenNotification`: the per-state
+pose loops are `SKAction`s still on SpriteKit's clock, so without the kick the pet's position keeps
+updating while its pose freezes.
 
 The pet **is** a 96×96 borderless `NSPanel` that gets `setFrameOrigin`'d to walk around — not a
 full-screen overlay. `PetPanel.swift` holds two panel recipes: `PetPanel` (interactive) and
@@ -50,6 +68,11 @@ changes. Don't replace this with a global event monitor or alpha hit-testing —
 for reasons the README explains.
 
 The pet is pinned to one display via `homeScreenID`; only dragging and "Come Here" change screens.
+`step` skips `clampToScreen` while a drag is in progress — clamping mid-drag pins the pet inside its
+current display, which both prevents the move and makes the drop-detection a no-op. Screens are
+resolved with `nearestScreen(to:)` rather than `frame.contains`, because a non-rectangular desktop
+(a portrait display beside a landscape one) has regions belonging to no screen at all, and a drop
+there would otherwise leave `homeScreenID` stale and snap the pet back across the gap.
 
 ### Art is code, and the pose lists are duplicated
 

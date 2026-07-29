@@ -3,10 +3,7 @@ import SpriteKit
 
 final class PetScene: SKScene {
     private let sprite = SKSpriteNode()
-    private var lastUpdate: TimeInterval = 0
     private var animations: [PetState: SKAction] = [:]
-
-    var onFrame: ((TimeInterval) -> Void)?
 
     override init(size: CGSize) {
         super.init(size: size)
@@ -30,13 +27,6 @@ final class PetScene: SKScene {
 
     func setFacing(_ facing: CGFloat) {
         sprite.xScale = facing >= 0 ? 1 : -1
-    }
-
-    override func update(_ currentTime: TimeInterval) {
-        defer { lastUpdate = currentTime }
-        guard lastUpdate > 0 else { return }
-        let dt = min(currentTime - lastUpdate, 1.0 / 15.0)
-        onFrame?(dt)
     }
 
     private func buildAnimations() {
