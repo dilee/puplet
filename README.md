@@ -17,23 +17,22 @@ on-device brain wants macOS 26 with Apple Intelligence enabled. Both optional -
 the pup degrades gracefully to canned lines.
 
 ```sh
-./scripts/bundle.sh release     # builds build/Puplet.app
-open build/Puplet.app
+make run        # builds build/Puplet.app and (re)launches it
 ```
 
 It launches as a menu-bar agent - look for the paw icon. No Dock icon, no window
 list entry. Quit from the paw menu (or right-click the pup).
 
-For a fast iteration loop during development:
+For a fast iteration loop during development (`make help` lists everything):
 
 ```sh
-swift run Puplet                        # runs unbundled (Dock icon appears, LSUIElement needs the bundle)
-swift run Puplet --dump-frames ./frames # renders every animation pose to PNG, no app launch
-swift run Puplet --chat "hi pup"        # exercises the chat-brain ladder in the terminal, no app launch
+make frames              # renders every animation pose to PNG, no app launch
+make chat MSG="hi pup"   # exercises the chat-brain ladder in the terminal
+swift run Puplet         # runs unbundled (Dock icon appears, LSUIElement needs the bundle)
 ```
 
-`--dump-frames` also writes `contact-sheet.png` - the fastest way to iterate on
-the art without watching the pup walk around. `--chat` prints which brain
+`make frames` also writes `contact-sheet.png` - the fastest way to iterate on
+the art without watching the pup walk around. `make chat` prints which brain
 answered, so you can verify the Claude Code layer before trusting the menu.
 
 ## What it does
