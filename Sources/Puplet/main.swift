@@ -9,6 +9,12 @@ MainActor.assumeIsolated {
         exit(0)
     }
 
+    if let index = arguments.firstIndex(of: "--dump-gif") {
+        let path = arguments.count > index + 1 ? arguments[index + 1] : "./docs/demo.gif"
+        GifDumper.run(to: path)
+        exit(0)
+    }
+
     if let index = arguments.firstIndex(of: "--chat") {
         let message = arguments.count > index + 1 ? arguments[index + 1] : "hello!"
         let brain = LayeredBrain(useOnDeviceModel: true)

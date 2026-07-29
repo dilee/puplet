@@ -3,7 +3,7 @@
 A pup-sized AI pet that lives on your macOS desktop. Native Swift + AppKit + SpriteKit, no
 dependencies, no permission prompts.
 
-<img width="96" alt="the pup" src="docs/preview.png">
+<img width="480" alt="the pup walking in, chatting with a streaming speech bubble, and falling asleep" src="docs/demo.gif">
 
 All five states ([`docs/poses.png`](docs/poses.png) - idle, walk, sit, sleep, excited):
 
@@ -75,6 +75,7 @@ chat status · Quit.
 | `Settings.swift` | `UserDefaults`-backed pet name + the rename prompt |
 | `WorkspaceContext.swift` | Zero-permission context: frontmost app, time of day |
 | `FrameDumper.swift` | `--dump-frames` art iteration helper |
+| `GifDumper.swift` | `--dump-gif` renders the README demo animation |
 
 ## Design decisions worth keeping
 

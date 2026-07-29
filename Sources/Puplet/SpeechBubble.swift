@@ -26,22 +26,19 @@ final class BubbleView: NSView {
         )
     }
 
-    override var isFlipped: Bool { false }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+    static func draw(text: String, in frame: NSRect, ctx: CGContext) {
         let box = NSRect(
-            x: 0,
-            y: Self.tailHeight,
-            width: bounds.width,
-            height: bounds.height - Self.tailHeight
+            x: frame.minX,
+            y: frame.minY + tailHeight,
+            width: frame.width,
+            height: frame.height - tailHeight
         )
 
         let path = CGMutablePath()
         path.addRoundedRect(in: box, cornerWidth: 11, cornerHeight: 11)
-        let tailX = bounds.midX
+        let tailX = frame.midX
         path.move(to: CGPoint(x: tailX - 7, y: box.minY + 1))
-        path.addLine(to: CGPoint(x: tailX + 1, y: 0))
+        path.addLine(to: CGPoint(x: tailX + 1, y: frame.minY))
         path.addLine(to: CGPoint(x: tailX + 7, y: box.minY + 1))
         path.closeSubpath()
 
@@ -55,12 +52,19 @@ final class BubbleView: NSView {
         ctx.strokePath()
 
         let textRect = NSRect(
-            x: Self.padding.width,
-            y: box.minY + Self.padding.height,
-            width: box.width - Self.padding.width * 2,
-            height: box.height - Self.padding.height * 2
+            x: frame.minX + padding.width,
+            y: box.minY + padding.height,
+            width: box.width - padding.width * 2,
+            height: box.height - padding.height * 2
         )
-        (text as NSString).draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: Self.attributes)
+        (text as NSString).draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes)
+    }
+
+    override var isFlipped: Bool { false }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        Self.draw(text: text, in: bounds, ctx: ctx)
     }
 }
 

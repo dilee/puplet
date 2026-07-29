@@ -3,7 +3,7 @@ MSG ?= hi pup
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build bundle run quit frames chat clean
+.PHONY: help build bundle run quit frames gif chat clean
 
 help:
 	@echo "Puplet"
@@ -13,6 +13,7 @@ help:
 	@echo "  make run        bundle, then (re)launch the app"
 	@echo "  make quit       quit the running app"
 	@echo "  make frames     render every animation pose to ./frames"
+	@echo "  make gif        regenerate the README demo animation"
 	@echo "  make chat       talk to the chat brains: make chat MSG=\"who are you?\""
 	@echo "  make clean      remove build artifacts and rendered frames"
 
@@ -32,6 +33,9 @@ quit:
 
 frames:
 	swift run Puplet --dump-frames ./frames
+
+gif:
+	swift run Puplet --dump-gif docs/demo.gif
 
 chat:
 	swift run Puplet --chat "$(MSG)"
