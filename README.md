@@ -76,6 +76,7 @@ chat status · Quit.
 | `WorkspaceContext.swift` | Zero-permission context: frontmost app, time of day |
 | `FrameDumper.swift` | `--dump-frames` art iteration helper |
 | `GifDumper.swift` | `--dump-gif` renders the README demo animation |
+| `IconDumper.swift` | `--dump-icon` renders the app icon, one recipe per size |
 
 ## Design decisions worth keeping
 
@@ -209,12 +210,44 @@ persona prompt silently won't cache.
 
 ## Distribution
 
-`bundle.sh` ad-hoc signs, which is fine locally. To ship to anyone else you need
-a Developer ID, hardened runtime, `xcrun notarytool submit --wait`, and
-`xcrun stapler staple` - since Sequoia removed the Control-click Gatekeeper
-bypass, unnotarized apps just look broken. The overlay recipe here is
-sandbox-safe, but the Mac App Store has no precedent for a screen-roaming pet
-window, so budget for review friction if that's the goal.
+Once a release is published, that's a Homebrew cask away:
+
+```sh
+brew install --cask dilee/tap/puplet
+```
+
+`make release VERSION=0.1.0` does the whole chain: builds, stamps the version into
+`Info.plist`, signs with your Developer ID under the hardened runtime, submits to
+Apple, staples the ticket, packages the zip, and writes a filled-in
+`build/puplet.rb` to copy into the tap. It prints the `git tag` and
+`gh release create` commands rather than running them.
+
+All four links matter. Homebrew Cask quarantines what it downloads, and since
+Sequoia removed the Control-click Gatekeeper bypass an unstapled app just looks
+broken with no way for the user around it. Notarization needs `--options runtime`
+and `--timestamp` at signing time, and the ticket can only be stapled to the
+bundle - never to an archive - so the publishable zip is created *after* stapling.
+
+One-time setup, and the failure mode if you skip it:
+
+```sh
+security find-identity -v -p codesigning        # need a "Developer ID Application" row
+xcrun notarytool store-credentials puplet-notary \
+  --apple-id <you> --team-id <TEAMID> --password <app-specific-password>
+```
+
+`scripts/release.sh <version> --skip-notarize` rehearses everything except Apple's
+part, which is the way to check the pipeline without burning a submission.
+
+The hardened runtime does **not** need entitlements here: it restricts loading
+code into the process, not spawning children, so `ClaudeCodeBrain`'s
+`zsh -l -c … claude` still works signed. Worth re-testing after any change to how
+that subprocess is launched, via
+`./build/Puplet.app/Contents/MacOS/Puplet --chat "hi"` on the signed bundle.
+
+The overlay recipe is sandbox-safe, but the Mac App Store has no precedent for a
+screen-roaming pet window, so budget for review friction if that ever becomes the
+goal.
 
 ## License
 

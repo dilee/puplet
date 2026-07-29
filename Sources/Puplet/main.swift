@@ -9,6 +9,12 @@ MainActor.assumeIsolated {
         exit(0)
     }
 
+    if let index = arguments.firstIndex(of: "--dump-icon") {
+        let directory = arguments.count > index + 1 ? arguments[index + 1] : "./build/AppIcon.iconset"
+        IconDumper.run(into: directory)
+        exit(0)
+    }
+
     if let index = arguments.firstIndex(of: "--dump-gif") {
         let path = arguments.count > index + 1 ? arguments[index + 1] : "./docs/demo.gif"
         GifDumper.run(to: path)

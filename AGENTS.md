@@ -14,6 +14,8 @@ make run                 # release build → build/Puplet.app → quit old insta
 make bundle              # build the .app without launching
 make build               # plain `swift build`
 make quit                # osascript quit of the running app
+make icon                # re-render Resources/AppIcon.icns
+make release VERSION=x   # sign + notarize + staple + package + emit the cask
 make frames              # render every pose to ./frames + contact-sheet.png (no app launch)
 make gif                 # regenerate docs/demo.gif
 make chat MSG="hi pup"   # exercise the chat ladder in the terminal, prints which layer answered
@@ -25,8 +27,8 @@ There is **no test target**. Verification is manual: `make frames` for art, `mak
 brain ladder, `make run` for behavior. Prefer the two headless modes — they skip `NSApplication`
 entirely and are the fast loop.
 
-`main.swift` intercepts `--dump-frames`, `--dump-gif`, and `--chat` before the app starts and
-`exit(0)`s. Add new headless tools there.
+`main.swift` intercepts `--dump-frames`, `--dump-gif`, `--dump-icon`, and `--chat` before the app
+starts and `exit(0)`s. Add new headless tools there.
 
 ## Architecture
 
@@ -139,6 +141,31 @@ which layer actually answered.
   `chatEffort` read per-message directly in `ClaudeCodeBrain.buildArguments`.
 - Renaming the `Puplet` target would also need `scripts/bundle.sh` and `CFBundleExecutable` in
   `Resources/Info.plist` updated.
+
+## Releasing
+
+`scripts/release.sh <version>` chains build → version-stamp → Developer ID signing under the
+hardened runtime → notarize → staple → zip → cask. Constraints that are easy to break by
+reordering:
+
+- `--options runtime` and `--timestamp` are both notarization prerequisites, not optional hardening.
+- The ticket staples to the **bundle**; an archive cannot be stapled. So the publishable zip is
+  produced *after* stapling, and the one submitted to Apple is a throwaway.
+- Homebrew Cask quarantines its downloads, so an unstapled build fails on a user's first launch
+  even though it launches fine on the machine that built it. Never judge distributability locally.
+- `--skip-notarize` rehearses the chain without contacting Apple. Use it for any change to the
+  script; a real submission is slow and rate-limits badly.
+- No entitlements file, deliberately: the hardened runtime restricts loading code into the process,
+  not spawning children, so `ClaudeCodeBrain` works signed. If that subprocess launch changes,
+  re-test on the *signed bundle* with
+  `./build/Puplet.app/Contents/MacOS/Puplet --chat "hi"` — the unsigned `swift run` path proves
+  nothing about the hardened runtime.
+
+`Resources/AppIcon.icns` is committed, and `bundle.sh` regenerates it if missing. `IconDumper`
+draws each size from its own recipe rather than downsampling one master, because the small tiles
+need heavier ink, a tighter crop, and `CreatureStyle.simplified` to drop sub-pixel decorations. Both
+knobs default off, so the live sprite is unaffected — after touching `Creature.swift`, check
+`make frames`' contact sheet to confirm the in-app art is unchanged.
 
 ## Code style
 

@@ -73,9 +73,6 @@ enum PetPersona {
 }
 
 enum PetSpeech {
-    /// Strips roleplay stage directions (`*wags tail*`) from generated text. The sprite already
-    /// shows what the pet is doing, so narration reads as noise. Text after an unclosed `*` is
-    /// dropped too, which is what keeps a half-streamed direction from flashing into the bubble.
     static func clean(_ raw: String) -> String {
         var out = ""
         var insideDirection = false

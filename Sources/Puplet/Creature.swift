@@ -7,6 +7,8 @@ struct CreatureStyle {
     var ink = NSColor(srgbRed: 0.24, green: 0.16, blue: 0.12, alpha: 1)
     var blush = NSColor(srgbRed: 0.95, green: 0.58, blue: 0.56, alpha: 1)
     var tongue = NSColor(srgbRed: 0.94, green: 0.49, blue: 0.54, alpha: 1)
+    var outline: CGFloat = 2.6
+    var simplified = false
 
     static let `default` = CreatureStyle()
 }
@@ -33,15 +35,13 @@ enum CreatureRenderer {
     static let canvas = CGSize(width: 96, height: 96)
     static let groundInset: CGFloat = 12
 
-    private static let outline: CGFloat = 2.6
-
     static func image(for pose: Pose, style: CreatureStyle = .default) -> NSImage {
         render(size: canvas, scale: 2) { ctx in
             draw(pose: pose, style: style, in: ctx)
         }
     }
 
-    private static func draw(pose: Pose, style: CreatureStyle, in ctx: CGContext) {
+    static func draw(pose: Pose, style: CreatureStyle, in ctx: CGContext) {
         let cx = canvas.width / 2
         let squash = pose.squash
         let ground = groundInset + pose.lift
@@ -53,7 +53,7 @@ enum CreatureRenderer {
         let bottom = pose.tucked ? ground : ground + 6 + bob
         let body = CGRect(x: cx - w / 2, y: bottom, width: w, height: h)
 
-        ctx.setLineWidth(outline)
+        ctx.setLineWidth(style.outline)
         ctx.setLineCap(.round)
         ctx.setLineJoin(.round)
 
@@ -112,6 +112,8 @@ enum CreatureRenderer {
         ctx.addPath(path)
         ctx.setStrokeColor(style.ink.cgColor)
         ctx.strokePath()
+
+        guard !style.simplified else { return }
 
         let shine = CGRect(
             x: body.midX - body.width * 0.26,
@@ -249,31 +251,37 @@ enum CreatureRenderer {
         ctx.addEllipse(in: muzzle)
         ctx.setFillColor(style.muzzle.cgColor)
         ctx.fillPath()
-        ctx.addEllipse(in: muzzle)
-        ctx.setStrokeColor(style.ear.withAlphaComponent(0.8).cgColor)
-        ctx.setLineWidth(1.2)
-        ctx.strokePath()
-        ctx.setLineWidth(outline)
+        if !style.simplified {
+            ctx.addEllipse(in: muzzle)
+            ctx.setStrokeColor(style.ear.withAlphaComponent(0.8).cgColor)
+            ctx.setLineWidth(1.2)
+            ctx.strokePath()
+            ctx.setLineWidth(style.outline)
+        }
 
         let nose = CGRect(x: cx - 5.7, y: muzzle.maxY - 9.6, width: 11.4, height: 8.0)
         ctx.addEllipse(in: nose)
         ctx.setFillColor(style.ink.cgColor)
         ctx.fillPath()
-        ctx.setFillColor(NSColor.white.withAlphaComponent(0.7).cgColor)
-        ctx.addEllipse(in: CGRect(x: nose.minX + 2.2, y: nose.maxY - 3.6, width: 2.8, height: 2.1))
-        ctx.fillPath()
+        if !style.simplified {
+            ctx.setFillColor(NSColor.white.withAlphaComponent(0.7).cgColor)
+            ctx.addEllipse(in: CGRect(x: nose.minX + 2.2, y: nose.maxY - 3.6, width: 2.8, height: 2.1))
+            ctx.fillPath()
+        }
 
-        ctx.setStrokeColor(style.ink.cgColor)
-        ctx.setLineWidth(1.9)
-        ctx.move(to: CGPoint(x: cx, y: nose.minY))
-        ctx.addLine(to: CGPoint(x: cx, y: nose.minY - 2.8))
-        ctx.strokePath()
         let mouthY = nose.minY - 2.8
-        ctx.move(to: CGPoint(x: cx - 6.0, y: mouthY + 2.2))
-        ctx.addQuadCurve(to: CGPoint(x: cx, y: mouthY), control: CGPoint(x: cx - 3.2, y: mouthY - 0.6))
-        ctx.addQuadCurve(to: CGPoint(x: cx + 6.0, y: mouthY + 2.2), control: CGPoint(x: cx + 3.2, y: mouthY - 0.6))
-        ctx.strokePath()
-        ctx.setLineWidth(outline)
+        if !style.simplified {
+            ctx.setStrokeColor(style.ink.cgColor)
+            ctx.setLineWidth(1.9)
+            ctx.move(to: CGPoint(x: cx, y: nose.minY))
+            ctx.addLine(to: CGPoint(x: cx, y: mouthY))
+            ctx.strokePath()
+            ctx.move(to: CGPoint(x: cx - 6.0, y: mouthY + 2.2))
+            ctx.addQuadCurve(to: CGPoint(x: cx, y: mouthY), control: CGPoint(x: cx - 3.2, y: mouthY - 0.6))
+            ctx.addQuadCurve(to: CGPoint(x: cx + 6.0, y: mouthY + 2.2), control: CGPoint(x: cx + 3.2, y: mouthY - 0.6))
+            ctx.strokePath()
+            ctx.setLineWidth(style.outline)
+        }
 
         if pose.tongue {
             let tongueRect = CGRect(x: cx - 4.4, y: mouthY - 9.5, width: 8.8, height: 10.5)
@@ -285,12 +293,13 @@ enum CreatureRenderer {
             ctx.setStrokeColor(style.ink.cgColor)
             ctx.setLineWidth(1.8)
             ctx.strokePath()
-            ctx.setLineWidth(outline)
+            ctx.setLineWidth(style.outline)
         }
 
         let eyeY = body.minY + h * 0.60
         let dx: CGFloat = 9.5
         ctx.setFillColor(style.ink.cgColor)
+        ctx.setStrokeColor(style.ink.cgColor)
 
         for sign in [CGFloat(-1), 1] {
             let center = CGPoint(x: cx + sign * dx, y: eyeY)
@@ -298,13 +307,15 @@ enum CreatureRenderer {
             case .open:
                 ctx.addEllipse(in: CGRect(x: center.x - 4.7, y: center.y - 5.2, width: 9.4, height: 10.4))
                 ctx.fillPath()
-                ctx.setFillColor(NSColor.white.cgColor)
-                ctx.addEllipse(in: CGRect(x: center.x - 2.6, y: center.y + 0.6, width: 3.6, height: 3.6))
-                ctx.fillPath()
-                ctx.setFillColor(NSColor.white.withAlphaComponent(0.85).cgColor)
-                ctx.addEllipse(in: CGRect(x: center.x + 1.2, y: center.y - 3.2, width: 1.8, height: 1.8))
-                ctx.fillPath()
-                ctx.setFillColor(style.ink.cgColor)
+                if !style.simplified {
+                    ctx.setFillColor(NSColor.white.cgColor)
+                    ctx.addEllipse(in: CGRect(x: center.x - 2.6, y: center.y + 0.6, width: 3.6, height: 3.6))
+                    ctx.fillPath()
+                    ctx.setFillColor(NSColor.white.withAlphaComponent(0.85).cgColor)
+                    ctx.addEllipse(in: CGRect(x: center.x + 1.2, y: center.y - 3.2, width: 1.8, height: 1.8))
+                    ctx.fillPath()
+                    ctx.setFillColor(style.ink.cgColor)
+                }
             case .closed:
                 ctx.move(to: CGPoint(x: center.x - 4.5, y: center.y + 1.5))
                 ctx.addQuadCurve(
@@ -321,6 +332,8 @@ enum CreatureRenderer {
                 ctx.strokePath()
             }
         }
+
+        guard !style.simplified else { return }
 
         ctx.setFillColor(style.blush.withAlphaComponent(0.5).cgColor)
         for sign in [CGFloat(-1), 1] {
@@ -344,7 +357,7 @@ enum CreatureRenderer {
         ctx.restoreGState()
     }
 
-    private static func render(size: CGSize, scale: CGFloat, _ body: (CGContext) -> Void) -> NSImage {
+    static func render(size: CGSize, scale: CGFloat, _ body: (CGContext) -> Void) -> NSImage {
         let rep = NSBitmapImageRep(
             bitmapDataPlanes: nil,
             pixelsWide: Int(size.width * scale),

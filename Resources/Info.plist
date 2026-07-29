@@ -8,6 +8,8 @@
 	<string>Puplet</string>
 	<key>CFBundleExecutable</key>
 	<string>Puplet</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>dev.dilee.puplet</string>
 	<key>CFBundlePackageType</key>
