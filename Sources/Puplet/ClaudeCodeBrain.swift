@@ -168,14 +168,16 @@ final class ClaudeCodeBrain: ChatBrain, @unchecked Sendable {
         let body = Self.stripFences(result)
         if let data = body.data(using: .utf8),
            let contract = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let say = contract["say"] as? String, !say.isEmpty {
+           let raw = contract["say"] as? String {
+            let say = PetSpeech.clean(raw)
+            guard !say.isEmpty else { return nil }
             if let fact = contract["remember"] as? String {
                 memory.remember(fact)
             }
             return ChatReply(say: String(say.prefix(400)), mood: contract["mood"] as? String)
         }
 
-        let plain = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let plain = PetSpeech.clean(body)
         return plain.isEmpty ? nil : ChatReply(say: String(plain.prefix(400)), mood: nil)
     }
 
@@ -307,7 +309,7 @@ private final class StreamAccumulator: @unchecked Sendable {
             var grown: String?
             lock.lock()
             raw += text
-            if let partial = ClaudeCodeBrain.partialSay(from: raw),
+            if let partial = ClaudeCodeBrain.partialSay(from: raw).map(PetSpeech.clean),
                !partial.isEmpty, partial != lastEmitted {
                 lastEmitted = partial
                 grown = partial

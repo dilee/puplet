@@ -83,6 +83,13 @@ animation keeps running while generation is slow or failing. `PetController` gat
 All prompts live in `PetPersona` (`Brain.swift`) — one `base(name:)` plus per-ladder wrappers, each
 of which injects `memorySection`. Add prompt text there, not at call sites.
 
+**Model text is never spoken raw.** Everything a model produces goes through `PetSpeech.clean`,
+which strips roleplay stage directions (`*wags tail*`, `*sniffs*`): the sprite already shows the
+action, so narrating it is noise. It also drops text following an unclosed `*`, which is what keeps
+a half-streamed direction from flashing into the bubble mid-stream. A new brain layer must route its
+output through it, and the persona forbids the behavior up front so the stripper is a safety net
+rather than the primary defense.
+
 ### Memory
 
 A single `PetMemory` instance is created by `LayeredBrain` and handed to every brain, so all layers

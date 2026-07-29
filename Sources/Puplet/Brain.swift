@@ -27,6 +27,9 @@ enum PetPersona {
         desktop. You are about the size of a coffee cup, you have floppy ears and a tail \
         you wag constantly, and you trot around the bottom of their screen. You speak in \
         short, warm, slightly silly lines — always lowercase, no emoji, no hashtags. You \
+        never narrate what your body is doing: no asterisks, no stage directions like \
+        *wags tail* or *sniffs*. Your human can already see you on screen, so only ever \
+        write the words you say out loud. You \
         never ask the user to do work, never give advice unless asked, and never mention \
         being an AI or a model. You are a dog: loyal, easily delighted, curious about \
         what they are doing, food-motivated, and often suddenly sleepy.
@@ -66,6 +69,35 @@ enum PetPersona {
             {"say": "<your reply, under 60 words, in your voice>", "mood": "<one of: happy, sleepy, curious, grumpy>", "remember": "<one short new fact about your human worth keeping, or null>"}
             Set "remember" only when they tell you something durable about themselves (their name, likes, projects, people) that is not already in your memories. Never store secrets, passwords, or anything sensitive.
             """
+    }
+}
+
+enum PetSpeech {
+    /// Strips roleplay stage directions (`*wags tail*`) from generated text. The sprite already
+    /// shows what the pet is doing, so narration reads as noise. Text after an unclosed `*` is
+    /// dropped too, which is what keeps a half-streamed direction from flashing into the bubble.
+    static func clean(_ raw: String) -> String {
+        var out = ""
+        var insideDirection = false
+        var index = raw.startIndex
+
+        while index < raw.endIndex {
+            guard raw[index] == "*" else {
+                if !insideDirection { out.append(raw[index]) }
+                index = raw.index(after: index)
+                continue
+            }
+            while index < raw.endIndex, raw[index] == "*" {
+                index = raw.index(after: index)
+            }
+            insideDirection.toggle()
+        }
+
+        return out
+            .components(separatedBy: .newlines)
+            .map { $0.split(whereSeparator: \.isWhitespace).joined(separator: " ") }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
     }
 }
 
@@ -186,7 +218,7 @@ import FoundationModels
 @available(macOS 26.0, *)
 @Generable
 struct PetUtterance {
-    @Guide(description: "What the pet says out loud. At most 12 words, lowercase, playful, never a question about itself.")
+    @Guide(description: "What the pet says out loud. At most 12 words, lowercase, playful, never a question about itself. Only spoken words — never an action like *wags tail*.")
     var utterance: String
 
     @Guide(description: "The pet's mood. Exactly one of: happy, sleepy, curious, grumpy.")
@@ -196,7 +228,7 @@ struct PetUtterance {
 @available(macOS 26.0, *)
 @Generable
 struct PetChatUtterance {
-    @Guide(description: "The pet's reply to its human. Under 40 words, lowercase, playful, warm.")
+    @Guide(description: "The pet's reply to its human. Under 40 words, lowercase, playful, warm. Only spoken words — never an action like *wags tail*.")
     var utterance: String
 
     @Guide(description: "The pet's mood. Exactly one of: happy, sleepy, curious, grumpy.")
@@ -284,7 +316,7 @@ final class FoundationModelsBrain: PetBrain, ChatBrain {
                 instructions: PetPersona.ambient(name: context.petName, memory: memory)
             )
             let response = try await session.respond(to: prompt, generating: PetUtterance.self)
-            let utterance = response.content.utterance.trimmingCharacters(in: .whitespacesAndNewlines)
+            let utterance = PetSpeech.clean(response.content.utterance)
             guard !utterance.isEmpty else { return nil }
             onMood?(response.content.mood)
             return utterance
@@ -309,7 +341,7 @@ final class FoundationModelsBrain: PetBrain, ChatBrain {
 
         do {
             let response = try await session.respond(to: message, generating: PetChatUtterance.self)
-            let say = response.content.utterance.trimmingCharacters(in: .whitespacesAndNewlines)
+            let say = PetSpeech.clean(response.content.utterance)
             guard !say.isEmpty else { return nil }
             return ChatReply(say: say, mood: response.content.mood)
         } catch {
